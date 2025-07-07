@@ -1,0 +1,75 @@
+Free‑Use‑Non‑Commercial‑Share‑Alike Licence ("FUNCSA") v1.0
+
+Copyright © 2025 Steven R.Talbot – All rights reserved.
+
+1. Preamble
+
+The software package pawlineR (the "Software") is released under this Free‑Use‑Non‑Commercial‑Share‑Alike Licence (the "Licence").  The goal of this Licence is to allow private, educational and research use free of charge while ensuring that improvements are shared alike and that commercial exploitation occurs only with the Licensor’s consent.
+
+THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.  The developer accepts no liability for incorrect or incomplete data, calculations, or any direct or indirect damages arising from the use of the Software.  All information produced by the Software is for guidance only and does not constitute professional advice (e.g. on animal breeding).  Always obtain qualified advice before making decisions based on results produced by the Software.
+
+2. Definitions
+
+"Licensor" – Steven Talbot, the copyright holder.
+
+"Licensee" / "You" – any individual or legal entity exercising rights under this Licence.
+
+"Non‑Commercial Use" – any use that is not intended for or directed toward commercial advantage or monetary compensation.
+
+"Derivative Work" – any work that is based upon, contains, or is otherwise derived from all or part of the Software.
+
+3. Grant of Rights
+
+Subject to the terms and conditions of this Licence, the Licensor hereby grants You a worldwide, royalty‑free, non‑exclusive, non‑transferable right to:
+  
+  Run and Use the Software in Non‑Commercial environments without restriction;
+
+Copy and Distribute the Software in unmodified form for Non‑Commercial purposes;
+
+Modify the Software and create Derivative Works for Non‑Commercial purposes; and
+
+Distribute such Derivative Works provided that all conditions in §4 (Share‑Alike & Attribution) are met.
+
+4. Share‑Alike & Attribution Conditions
+
+Any distribution of the Software or Derivative Works must satisfy all of the following:
+  
+  The work is licensed under this same Licence (FUNCSA) without additional restrictions.
+
+A copy of this Licence and the following notice is included in a prominent place in the distribution and in the accompanying documentation:
+  
+  pawlineR — Copyright © 2025 Steven R Talbot — Licensed under FUNCSA v1.0
+
+Reasonable attribution to the Licensor is maintained in any user‑facing documentation or about‑box.
+
+Pull‑Request Obligation – Prior to, or concurrently with, public release of any Derivative Work, You must submit a pull request to the upstream repository or otherwise notify the Licensor, so that collaboration and code quality can be maintained.
+
+5. Commercial Use Requires Prior Consent
+
+Any use, distribution, or integration of the Software (or any Derivative Work) for commercial purposes — including but not limited to selling, sublicensing, SaaS deployment, or bundling with commercial products or services — requires the Licensor’s prior written permission.  Please contact talbot.steven@mh-hannover.de to request such permission.
+
+6. Data Protection
+
+The Software does not, by default, collect or transmit personal data.  All stored information remains on the Licensee’s local machine, to the extent controlled by the Licensor.  The Licensor assumes no responsibility for data processed outside of the Software’s published source code.
+
+7. Disclaimer of Warranty
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON‑INFRINGEMENT.
+
+8. Limitation of Liability
+
+IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+9. Termination
+
+Failure to comply with any condition of this Licence automatically and immediately terminates Your rights under it.  Upon termination, You must cease all use, distribution and modification of the Software, and destroy all copies in Your possession.
+
+10. Updates to the Licence
+
+The Licensor reserves the right to publish revised or updated versions of this Licence at any time.  Unless explicitly stated otherwise, no new Licence is granted; continued use of the Software requires acceptance of the then‑current version.
+
+11. Severability
+
+If any provision of this Licence is held to be unenforceable, the remaining provisions shall remain in full force and effect.
+
+Version 0.9002 — Effective 01 July 2025
