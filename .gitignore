@@ -1,0 +1,10 @@
+# R user artefacts
+.Rhistory
+.RData
+.Rproj.user/
+
+# macOS cruft
+.DS_Store
+
+# local database must stay private
+db/animals_db.sqlite
