@@ -40,4 +40,4 @@ limits we can control by publishing via GitHub.
 
 We reserve the right to modify features, content or licence terms at any time. Check the repository regularly for updates.
 
-Version (2025) v0.9002 — effective 01 July 2025
+Version (2025) v0.01 — effective 01 July 2025

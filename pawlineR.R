@@ -1,6 +1,3 @@
-###############################################################################
-#  pawlineR – Cat Breeding Management                                         #
-###############################################################################
 library(shiny)
 library(shinydashboard)
 library(shinyjs)
@@ -8,13 +5,13 @@ library(DBI)
 library(RSQLite)
 library(DT)
 library(dplyr)
-library(purrr)        
+library(purrr)
 library(ribd)
 library(markdown)
 library(igraph)
 library(pedtools)
-library(readxl)      # Excel → R
-library(openxlsx)    # R → Excel
+library(readxl)       
+library(openxlsx)     
 
 # ── database bootstrap (blank if new clone) ─────────────────────────────────
 db_path <- file.path("db", "animals_db.sqlite")
@@ -98,7 +95,25 @@ addMissingFounders <- function(df) {
     )
     df <- bind_rows(df, founders)
   }
-  distinct(df)
+  ## keep first occurrence *with* its data
+  distinct(df, id, .keep_all = TRUE)
+}
+
+# NEW: helper to fold planned offspring into a
+#      pedigree‑style data frame --------------------------------------------
+plannedToPed <- function(plan_df) {
+  if (nrow(plan_df) == 0) {
+    return(data.frame(
+      id = character(), fid = character(), mid = character(), sex = integer()
+    ))
+  }
+  plan_df %>%
+    transmute(
+      id  = child_name,
+      fid = ifelse(father_label == "unknown", NA_character_, father_label),
+      mid = ifelse(mother_label == "unknown", NA_character_, mother_label),
+      sex = as.integer(child_sex_code)
+    )
 }
 
 # ── custom CSS ──────────────────────────────────────────────────────────────
@@ -300,33 +315,65 @@ server <- function(input, output, session) {
   # pedigree plot -----------------------------------------------------------
   observeEvent(input$pedView, {
     chosenID <- input$pedView; req(chosenID)
-    df_ped <- rv_peddata()
+    
+    ## combine stored + planned – so the plot can already show uncommitted cats
+    df_ped <- bind_rows(rv_peddata(), plannedToPed(planned_df()))
     if (nrow(df_ped) == 0) {
       showNotification("No pedigree data available.", type = "error"); return()
     }
+    
     g_sub <- buildPedSubgraph(df_ped, chosenID)
-    adf   <- animalsDB()
-    V(g_sub)$inb <- sapply(V(g_sub)$name, function(animalID) {
+    
+    ## collect inbreeding & sex for all vertices ----------------------------
+    adf  <- animalsDB()
+    pldf <- planned_df()
+    getInb <- function(animalID) {
       rowA <- adf[adf$original_id == animalID, ]
-      if (nrow(rowA) > 0) rowA$inbreeding[1] else NA
-    })
+      if (nrow(rowA) > 0) return(rowA$inbreeding[1])
+      rowP <- pldf[pldf$child_name == animalID, ]
+      if (nrow(rowP) > 0) return(rowP$inbreeding[1])
+      NA
+    }
+    getSex <- function(animalID) {
+      row1 <- df_ped[df_ped$id == animalID, ]
+      if (nrow(row1) > 0) return(as.integer(row1$sex[1]))
+      0L
+    }
+    V(g_sub)$inb <- sapply(V(g_sub)$name, getInb)
+    V(g_sub)$sex <- sapply(V(g_sub)$name, getSex)
+    
     output$pedPlot <- renderPlot({
       if (gorder(g_sub) == 1 && gsize(g_sub) == 0) {
         plot.new(); text(0.5, 0.5, paste("No ancestors found for:", chosenID))
       } else {
-        root_idx <- which(V(g_sub)$name == chosenID)
-        if (length(root_idx) == 0) root_idx <- 1
-        coords <- layout_as_tree(g_sub, root = root_idx, circular = FALSE)
-        coords[, 2] <- -coords[, 2]
-        node_labels <- paste0(V(g_sub)$name, "\nInb = ",
-                              round(V(g_sub)$inb, 3))
-        plot(g_sub, layout = coords, vertex.label = node_labels,
+        ## improved layout: Sugiyama for layered (almost-tree) graphs --------
+        coords <- layout_with_sugiyama(g_sub)$layout
+        coords[, 2] <- max(coords[, 2]) - coords[, 2]  # root at top
+        
+        ## vertex shapes & colours by sex -----------------------------------
+        sex_vec   <- V(g_sub)$sex
+        shape_vec <- ifelse(sex_vec == 1, "square",
+                            ifelse(sex_vec == 2, "circle", "circle"))
+        colour_vec <- ifelse(sex_vec == 1, "lightblue",
+                             ifelse(sex_vec == 2, "pink", "lightgrey"))
+        
+        node_labels <- paste0(V(g_sub)$name,
+                              ifelse(is.na(V(g_sub)$inb),
+                                     "", paste0("\nF = ", round(V(g_sub)$inb, 3))))
+        
+        plot(g_sub, layout = coords,
+             vertex.shape = shape_vec,
+             vertex.color = colour_vec,
+             vertex.frame.color = "black",
+             vertex.size = 40,
+             vertex.label = node_labels,
              vertex.label.color = "black",
-             main = paste("Pedigree of:", chosenID),
-             vertex.size = 40, vertex.label.cex = 1.2,
-             vertex.color = "lightblue", edge.arrow.size = 1)
+             vertex.label.cex = 1.1,
+             edge.arrow.size = 0.8,
+             main = paste("Pedigree of:", chosenID))
       }
     })
+    
     updateTabsetPanel(session, "breedingTabs",
                       selected = "Pedigree Visualisation")
   })
@@ -387,7 +434,8 @@ server <- function(input, output, session) {
   
   # select-box refresh ------------------------------------------------------
   observe({
-    df_ped <- rv_peddata()
+    ## include new (planned) animals so you can select them as parents
+    df_ped <- bind_rows(rv_peddata(), plannedToPed(planned_df()))
     if (nrow(df_ped) == 0) {
       updateSelectizeInput(session, "selFather",
                            choices = c("Unknown" = "NA"), selected = "NA")
@@ -406,17 +454,23 @@ server <- function(input, output, session) {
   
   # btnAddPairing -----------------------------------------------------------
   observeEvent(input$btnAddPairing, {
-    df_ped <- rv_peddata(); req(df_ped)
+    ## existing and planned pedigree
+    df_ped      <- rv_peddata()
+    df_planned  <- planned_df()
+    df_combined <- bind_rows(df_ped, plannedToPed(df_planned))   # NEW
+    
     child_name <- input$txtChildName
     child_sex  <- as.integer(input$rdoChildSex)
     selFather  <- input$selFather
     selMother  <- input$selMother
+    
     if (child_name == "") {
       showNotification("Please enter a new animal name (ID).", type = "error"); return()
     }
-    if (child_name %in% df_ped$id || child_name %in% planned_df()$child_name) {
+    if (child_name %in% df_combined$id || child_name %in% df_planned$child_name) {
       showNotification("This name (ID) already exists.", type = "error"); return()
     }
+    
     father_known <- selFather != "NA"
     mother_known <- selMother != "NA"
     if (father_known && mother_known && selFather == selMother) {
@@ -425,21 +479,31 @@ server <- function(input, output, session) {
     if (xor(father_known, mother_known)) {
       showNotification("Specify either both parents or none.", type = "error"); return()
     }
+    
     father_id <- if (father_known) selFather else NA_character_
     mother_id <- if (mother_known) selMother else NA_character_
-    if (father_known && any(df_ped[df_ped$id == father_id, "sex"] == 2)) {
+    
+    ## check sexes also among *planned* animals  ----------------------------
+    getSexOf <- function(id) {
+      if (is.na(id)) return(0L)
+      row_comb <- df_combined[df_combined$id == id, ]
+      if (nrow(row_comb) == 0) return(0L)
+      row_comb$sex[1]
+    }
+    if (father_known && getSexOf(father_id) == 2) {
       showNotification("Selected father is female.", type = "error"); return()
     }
-    if (mother_known && any(df_ped[df_ped$id == mother_id, "sex"] == 1)) {
+    if (mother_known && getSexOf(mother_id) == 1) {
       showNotification("Selected mother is male.", type = "error"); return()
     }
+    
     new_row <- data.frame(
       id = child_name, fid = father_id, mid = mother_id,
       sex = child_sex, stringsAsFactors = FALSE
     )
-    df_ext <- addMissingFounders(bind_rows(df_ped, new_row))
-    df_ext$fid[df_ext$fid == "NA"] <- NA_character_
-    df_ext$mid[df_ext$mid == "NA"] <- NA_character_
+    
+    df_ext <- addMissingFounders(bind_rows(df_combined, new_row))   # NEW: includes *all*
+    ## build pedtools object
     ped_obj <- tryCatch(
       pedtools::ped(id  = df_ext$id,
                     fid = df_ext$fid,
@@ -448,11 +512,13 @@ server <- function(input, output, session) {
       error = function(e) { showNotification(e$message, type = "error"); NULL }
     )
     if (is.null(ped_obj)) return()
+    
     inb_val <- tryCatch(
       inbreeding(ped_obj, ids = child_name),
       error = function(e) { showNotification(e$message, type = "error"); NA_real_ }
     )
-    rv_peddata(df_ext)
+    
+    ## store in planned table + refresh -------------------------------------
     new_plan <- data.frame(
       child_name     = child_name,
       child_sex_code = child_sex,
@@ -462,8 +528,11 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE
     )
     planned_df(bind_rows(planned_df(), new_plan))
+    
+    ## clear input widgets
     updateTextInput(session, "txtChildName", value = "")
     updateRadioButtons(session, "rdoChildSex", selected = 0)
+    
     showNotification(
       sprintf("New animal '%s' added. Inbreeding = %.4f", child_name, inb_val),
       type = "message"
@@ -507,17 +576,21 @@ server <- function(input, output, session) {
     if (is.null(sel) || length(sel) == 0) return()
     df_plan     <- planned_df()
     selectedRow <- df_plan[sel, ]
+    
     child_name <- selectedRow$child_name
     child_sex  <- selectedRow$child_sex_code
     father_id  <- if (selectedRow$father_label == "unknown") NA else selectedRow$father_label
     mother_id  <- if (selectedRow$mother_label == "unknown") NA else selectedRow$mother_label
     inb_val    <- selectedRow$inbreeding
+    
     dbExecute(con,
               "INSERT INTO animals (original_id, sex_code, inbreeding, added_at)
        VALUES (?,?,?,?)",
               params = list(child_name, child_sex, inb_val,
                             format(Sys.time(), "%Y-%m-%d %H:%M:%S")))
+    
     new_id <- dbGetQuery(con, "SELECT last_insert_rowid() AS new_id")$new_id[1]
+    
     getNumericId <- function(orig_id) {
       if (is.null(orig_id) || is.na(orig_id)) return(NA)
       res <- dbGetQuery(con,
@@ -525,13 +598,16 @@ server <- function(input, output, session) {
                         params = list(orig_id))
       if (nrow(res) == 0) NA else res$numeric_id[1]
     }
+    
     dbExecute(con,
               "INSERT INTO pedigree (animal_id, sire_id, dam_id) VALUES (?,?,?)",
               params = list(new_id,
                             if (is.na(father_id)) NULL else getNumericId(father_id),
                             if (is.na(mother_id)) NULL else getNumericId(mother_id)))
+    
     showNotification(paste("Animal", child_name, "has been added to the database."),
                      type = "message")
+    
     planned_df(df_plan[-sel, ])
     animalsDB(loadAnimalsDB())
     rv_peddata(loadPedDataFromDB())
