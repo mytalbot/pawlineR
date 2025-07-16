@@ -8,3 +8,5 @@
 
 # local database must stay private
 db/animals_db.sqlite
+vps_app/app.R
+app.R

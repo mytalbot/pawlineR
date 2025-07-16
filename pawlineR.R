@@ -1,3 +1,7 @@
+###############################################################################
+#  pawlineR – Cat Breeding Management                                         #
+#  v0.02
+###############################################################################
 library(shiny)
 library(shinydashboard)
 library(shinyjs)
@@ -215,7 +219,19 @@ body <- dashboardBody(
   )
 )
 
-ui <- dashboardPage(header, sidebar, body, skin = "blue")
+# ── NEW footer --------------------------------------------------------------
+footer <- tags$footer(
+  class = "main-footer",
+  style = "padding:8px 0;width:100%;text-align:left;font-weight:600;",
+  HTML("pawlineR&copy; 2025  v0.01")
+)
+
+# ── Assemble the page -------------------------------------------------------
+ui <- tagList(                        #  ⬅️ wrap the dashboard in a tagList
+  dashboardPage(header, sidebar, body, skin = "blue"),
+  footer                               #  ⬅️ the new footer element
+)
+
 
 # ── server ------------------------------------------------------------------
 server <- function(input, output, session) {
