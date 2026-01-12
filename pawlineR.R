@@ -103,6 +103,22 @@ addMissingFounders <- function(df) {
   distinct(df, id, .keep_all = TRUE)
 }
 
+# NEW: helper to classify inbreeding coefficient into categories --------------
+# Based on established genetic relationships (Reviewer 1, Comment 11)
+classifyInbreeding <- function(f_value) {
+  if (is.na(f_value) || f_value == 0) {
+    return(list(category = "None", color = "#28a745", emoji = "\u2705"))
+  } else if (f_value < 0.0625) {
+    return(list(category = "Low", color = "#28a745", emoji = "\u2705"))
+  } else if (f_value < 0.125) {
+    return(list(category = "Moderate", color = "#ffc107", emoji = "\u26a0\ufe0f"))
+  } else if (f_value < 0.25) {
+    return(list(category = "High", color = "#fd7e14", emoji = "\u26a0\ufe0f"))
+  } else {
+    return(list(category = "Very High", color = "#dc3545", emoji = "\u274c"))
+  }
+}
+
 # NEW: helper to fold planned offspring into a
 #      pedigree‑style data frame --------------------------------------------
 plannedToPed <- function(plan_df) {
@@ -549,12 +565,15 @@ server <- function(input, output, session) {
     updateTextInput(session, "txtChildName", value = "")
     updateRadioButtons(session, "rdoChildSex", selected = 0)
     
+    # Classify inbreeding and show color-coded notification (Reviewer 1, Comment 11)
+    f_class <- classifyInbreeding(inb_val)
     showNotification(
-      sprintf("New animal '%s' added. Inbreeding = %.4f", child_name, inb_val),
-      type = "message"
+      sprintf("%s New animal '%s' added. F = %.4f (%s)",
+              f_class$emoji, child_name, inb_val, f_class$category),
+      type = if (f_class$category %in% c("High", "Very High")) "warning" else "message"
     )
   })
-  
+
   # reset planned -----------------------------------------------------------
   observeEvent(input$btnResetPlanned, {
     planned_df(planned_df()[0, ])
@@ -562,12 +581,28 @@ server <- function(input, output, session) {
   })
   
   # table_planned -----------------------------------------------------------
+  # Enhanced with F-value interpretation column (Reviewer 1, Comment 11)
   output$table_planned <- renderDT({
     df <- planned_df()
     if (nrow(df) == 0)
       return(datatable(data.frame(Notice = "No offspring planned."),
                        options = list(dom = "t")))
-    datatable(df, selection = "single", options = list(pageLength = 5))
+
+    # Add interpretation column with color-coded categories
+    df$F_interpretation <- sapply(df$inbreeding, function(f) {
+      f_class <- classifyInbreeding(f)
+      sprintf('<span style="color:%s;font-weight:bold;">%s %s</span>',
+              f_class$color, f_class$emoji, f_class$category)
+    })
+
+    # Reorder columns to show interpretation after inbreeding
+    col_order <- c("child_name", "child_sex_code", "father_label",
+                   "mother_label", "inbreeding", "F_interpretation")
+    df <- df[, col_order]
+
+    datatable(df, selection = "single", escape = FALSE,
+              options = list(pageLength = 5),
+              colnames = c("Name", "Sex", "Father", "Mother", "F", "Risk Level"))
   })
   
   # commit planned ----------------------------------------------------------
